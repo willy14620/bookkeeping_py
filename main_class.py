@@ -80,16 +80,16 @@ class application:
         self.input_group = tk.LabelFrame(self.frame, text='Input Group', padx=10, pady=10, bg='white')
         self.input_group.grid(column=1, row=2, columnspan=100,rowspan=100,pady=10)
         # Label
-        self.var_remain = tk.StringVar()
-        self.var_remain.set('Remain: (Click update button!)')
+        self.var_balance = tk.StringVar()
+        self.var_balance.set('Balance: (Click update button!)')
         self.amount_lbl = ttk.Label(self.input_group, text='Amount:')
         self.note_lbl = ttk.Label(self.input_group, text='Note:')
         self.date_lbl = ttk.Label(self.input_group, text='Date:')
-        self.remain_amount = ttk.Label(self.frame, textvariable=self.var_remain, style='r.TLabel')
+        self.balance_lbl = ttk.Label(self.frame, textvariable=self.var_balance, style='r.TLabel')
         self.amount_lbl.grid(column=0, row=0)
         self.note_lbl.grid(column=0, row=1)
         self.date_lbl.grid(column=0, row=2)
-        self.remain_amount.grid(column=1, row=0, sticky=tk.W, padx=10)
+        self.balance_lbl.grid(column=1, row=0, sticky=tk.W, padx=10)
         # Entry
         self.var_amount = tk.StringVar()
         self.var_note = tk.StringVar()
@@ -135,7 +135,7 @@ class application:
         database_method('export')
     def update_clicked(self):
         result = database_method('update')
-        self.var_remain.set('Remain: {0} (TWD)'.format(result))
+        self.var_balance.set('Balance: {0} (TWD)'.format(result))
     def close_clicked(self):
         if tkmsg.askyesno('Tip!','Do you want to close this application?'):    
             self.master.destroy()
