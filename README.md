@@ -2,4 +2,7 @@
 
 # Bookkeeping
 
-## How to use!
+### Purpose
+- Simple record of daily income and expenditure.
+
+### How to use!
