@@ -1,63 +1,16 @@
 # Application language: en
 # Author: willy14620
 # Import package
-import sqlite3
 import tkinter as tk
-import pandas as pd
 import tkinter.messagebox as tkmsg
 from tkinter import ttk
 from tkcalendar import DateEntry
 from os import path
+from database_api import database_method
 
-# Solve the problem of displaying Chinese format
-pd.set_option('display.unicode.ambiguous_as_wide',True)
-pd.set_option('display.unicode.east_asian_width',True)
-
-# Database filename
-DBNAME = 'accounting_book.db'
-POPUP_EXIST_WIN = False
-
-# Database method
-def database_method(method, data=None, bMethod=None):
-    global DBNAME
-    conn = sqlite3.connect(DBNAME)
-    cursor = conn.cursor()
-
-    if method == 'initialize':
-        cursor.execute('DROP TABLE IF EXISTS book')
-        cursor.execute('CREATE TABLE IF NOT EXISTS book('
-                    'id INTEGER PRIMARY KEY, '
-                    'method TEXT, '
-                    'amount INTEGER, '
-                    'notes TEXT,'
-                    'date TEXT )')
-    elif method == 'insert':
-        cursor.execute('INSERT INTO book VALUES(?, ?, ?, ?, ?)', data)
-    elif method == 'list':
-        cursor.execute('SELECT method, amount, notes, date FROM book WHERE method="{0}"'.format(bMethod))
-        df = pd.DataFrame(columns=['Amount', 'Notes', 'Date'])
-        for row in cursor.fetchall():
-            temp = [row[1], row[2], row[3]]
-            df = df.append(pd.Series(temp,df.columns),ignore_index=True)
-        if not df.empty:
-            print(df)
-        else:
-            print('尚未有任何資料！')
-    elif method == 'update':
-        temp = 0
-        cursor.execute('SELECT method, amount FROM book')
-        for row in cursor.fetchall():
-            if row[0] == 'Income':
-                temp = temp + row[1]
-            elif row[0] == 'Expenditure':
-                temp = temp - row[1]
-        return temp
-    elif method == 'export':
-        cursor.execute('SELECT method, amount, notes, date FROM book')
-        df = pd.DataFrame(cursor.fetchall(), columns=['income/expenditure','amount','notes','date'])
-        df.to_csv('book.csv', index=0)
-    conn.commit()
-    conn.close()
+# Determine whether objects exist
+LIST_WINDOW = False
+EXPORT_WINDOW = False
 
 # Graphical User Interface
 class application:
@@ -69,76 +22,97 @@ class application:
         self.widget_style()
         self.create_widget()
         self.frame.pack()
-    # Widget style
+    # Custom widget style
     def widget_style(self):
         ttk.Style().configure('TLabel', font=('Consolas', 12), background='white', foreground='black')
-        ttk.Style().configure('r.TLabel', font=('Consolas', 12), width=30, background='white', foreground='black')
+        ttk.Style().configure('a.TLabel', font=('Consolas', 10), background='white', foreground='black')
+        ttk.Style().configure('b.TLabel', font=('Consolas', 12), width=32, background='white', foreground='black')
         ttk.Style().configure('TButton', font=('Consolas',10), background='white', foreground='black', width=7)
+        ttk.Style().configure('e.TButton',font=('Consolas', 10), background='white', foreground='black', width=12)
+        ttk.Style().configure('TRadiobutton', font=('Consolas', 10), background='white', foreground='black')
     # Create widget
     def create_widget(self):
         # Label frame
         self.input_group = tk.LabelFrame(self.frame, text='Input Group', padx=10, pady=10, bg='white')
-        self.input_group.grid(column=1, row=2, columnspan=100,rowspan=100,pady=10)
+        self.input_group.grid(column=1, row=1, columnspan=100,rowspan=100,pady=10)
         # Label
         self.var_balance = tk.StringVar()
         self.var_balance.set('Balance: (Click update button!)')
         self.amount_lbl = ttk.Label(self.input_group, text='Amount:')
         self.note_lbl = ttk.Label(self.input_group, text='Note:')
         self.date_lbl = ttk.Label(self.input_group, text='Date:')
-        self.balance_lbl = ttk.Label(self.frame, textvariable=self.var_balance, style='r.TLabel')
-        self.amount_lbl.grid(column=0, row=0)
-        self.note_lbl.grid(column=0, row=1)
-        self.date_lbl.grid(column=0, row=2)
+        self.balance_lbl = ttk.Label(self.frame, textvariable=self.var_balance, style='b.TLabel')
+        self.author_lbl = ttk.Label(self.frame, text='Last Modified: 2020/08/24 Made by Willy14620', style='a.TLabel')
+        self.amount_lbl.grid(column=0, row=1)
+        self.note_lbl.grid(column=0, row=2)
+        self.date_lbl.grid(column=0, row=3)
         self.balance_lbl.grid(column=1, row=0, sticky=tk.W, padx=10)
+        self.author_lbl.grid(column=1,row=101, sticky=tk.E)
         # Entry
         self.var_amount = tk.StringVar()
         self.var_note = tk.StringVar()
         self.amount_ety = ttk.Entry(self.input_group, textvariable=self.var_amount)
         self.note_ety = ttk.Entry(self.input_group, textvariable=self.var_note)
-        self.amount_ety.grid(column=1, row=0, columnspan=5)
-        self.note_ety.grid(column=1, row=1, columnspan=5)
+        self.amount_ety.grid(column=1, row=1, columnspan=5)
+        self.note_ety.grid(column=1, row=2, columnspan=5)
         # ComboBox
-        self.control_cb = ttk.Combobox(self.frame, values=['Income','Expenditure'], state='readonly', width=10)
+        self.control_cb = ttk.Combobox(self.input_group, values=['Income','Expenditure'], state='readonly', width=10)
         self.control_cb.current(0)
-        self.control_cb.grid(column=1, row=1, sticky=tk.W, padx=10)
+        self.control_cb.grid(column=0, row=0, pady=5, sticky=tk.W)
         # DateEntry
-        self.cal = DateEntry(self.input_group, width=15, bg='white', fg='white', date_pattern='yyyy/MM/dd')
-        self.cal.grid(column=1, row=2,sticky='w',columnspan=5)
+        self.cal = DateEntry(self.input_group, width=15, bg='white', fg='white', date_pattern='yyyy-MM-dd')
+        self.cal.grid(column=1, row=3,sticky='w',columnspan=5)
         # Button
         self.list_btn = ttk.Button(self.frame, text='List', command=self.list_clicked)
         self.export_btn = ttk.Button(self.frame, text='Export', command=self.export_clicked)
         self.update_btn = ttk.Button(self.frame, text='Update', command=self.update_clicked)
         self.initialize_btn = ttk.Button(self.input_group, text='Initialize', command=self.initialize_clicked)
         self.insert_btn = ttk.Button(self.input_group, text='Insert', command=self.insert_clicked)
+        self.weekly_btn = ttk.Button(self.frame, text='Weekly', command=self.weekly_clicked)
         self.close_btn = ttk.Button(self.frame, text='Close', command=self.close_clicked)
         self.list_btn.grid(column=0, row=0, padx=5, pady=2.5)
         self.export_btn.grid(column=0, row=1, padx=5, pady=2.5)
         self.update_btn.grid(column=0, row=2, padx=5, pady=2.5)
-        self.initialize_btn.grid(column=0, row=3, pady=5)
-        self.insert_btn.grid(column=1, row=3, pady=5)
-        self.close_btn.grid(column=0, row=3, padx=5, pady=2.5)
+        self.initialize_btn.grid(column=0, row=4, pady=5, sticky=tk.E+tk.W)
+        self.insert_btn.grid(column=1, row=4, pady=5)
+        self.weekly_btn.grid(column=0, row=3, padx=5, pady=2.5)
+        self.close_btn.grid(column=0, row=4, padx=5, pady=2.5)
     # Button clicked event
     def list_clicked(self):
-        global POPUP_EXIST_WIN
-        if not POPUP_EXIST_WIN:
-            POPUP_EXIST_WIN = True
-            self.popup_win = tk.Toplevel(self.master)
-            self.popup_win.protocol("WM_DELETE_WINDOW", disable_event)
-            self.popup_win.title('Popup Window')
-            self.popup_win.geometry('300x70')
-            self.popup_win.config(bg='white')
-            self.popup_win.resizable(0, 0)
-            self.app = popup_window(self.popup_win)
+        global LIST_WINDOW
+        if not LIST_WINDOW:
+            LIST_WINDOW = True
+            self.popup_list = tk.Toplevel(self.master)
+            self.popup_list.protocol("WM_DELETE_WINDOW", disable_event)
+            self.popup_list.title('List Window')
+            self.popup_list.geometry('300x70')
+            self.popup_list.config(bg='white')
+            self.popup_list.resizable(0, 0)
+            self.app = List_win(self.popup_list)
         else:
             return
     def export_clicked(self):
-        database_method('export')
+        global EXPORT_WINDOW
+        if not EXPORT_WINDOW:
+            EXPORT_WINDOW = True
+            self.popup_export = tk.Toplevel(self.master)
+            self.popup_export.protocol("WM_DELETE_WINDOW", disable_event)
+            self.popup_export.title('Export Window')
+            self.popup_export.geometry('300x100')
+            self.popup_export.config(bg='white')
+            self.popup_export.resizable(0, 0)
+            self.app = Export_win(self.popup_export)
+        else:
+            return
+        # database_method('export')
     def update_clicked(self):
         result = database_method('update')
         self.var_balance.set('Balance: {0} (TWD)'.format(result))
     def close_clicked(self):
         if tkmsg.askyesno('Tip!','Do you want to close this application?'):    
             self.master.destroy()
+    def weekly_clicked(self):
+        database_method('weekly')
     def initialize_clicked(self):
         if tkmsg.askyesno('Initialize','Do you want to initialize database?'):
             database_method('initialize')
@@ -146,10 +120,13 @@ class application:
         if len(self.var_amount.get()) > 0 and len(self.var_note.get()) and len(self.cal.get()):
             data = (None, self.control_cb.get(), int(self.var_amount.get()), self.var_note.get(), self.cal.get())
             database_method('insert', data)
+            self.var_amount.set('')
+            self.var_note.set('')
         else:
             tkmsg.showerror('Error','Input entry cannnot be empty, please fill in completely!')
 
-class popup_window:
+# Custom pop up window
+class Popup_window:
     def __init__(self, master):
         self.master = master
         self.frame = tk.Frame(self.master)
@@ -157,38 +134,93 @@ class popup_window:
         self.create_widget()
         self.frame.pack()
     def create_widget(self):
+        pass
+
+# When List button be clicked, then pop up a window
+# Extend  class: Popup_window __init__
+class List_win(Popup_window):
+    def __init__(self, master):
+        super().__init__(master)
+    def create_widget(self):
         # Label
-        self.top_text = ttk.Label(self.frame, text='Choose you want to see')
-        self.top_text.grid(column=0, row=0, columnspan=3, sticky=tk.E+tk.W, padx=15)
+        self.top_text = ttk.Label(self.frame, text='Choose what you want to know')
+        self.top_text.grid(column=0, row=0, columnspan=4, sticky=tk.E+tk.W, padx=15)
 
         # Button
-        ttk.Style().configure('e.TButton',font=('Consolas', 10), background='white', foreground='black', width=12)
-        self.income_btn = ttk.Button(self.frame, text='Income', command=self.ib_clicked)
-        self.expenditure_btn = ttk.Button(self.frame, text='Expenditure', command=self.eb_clicked, style='e.TButton')
+        self.income_btn = ttk.Button(self.frame, text='Income', command=self.income_clicked)
+        self.expenditure_btn = ttk.Button(self.frame, text='Expenditure', command=self.expenditure_clicked, style='e.TButton')
+        self.both_btn = ttk.Button(self.frame, text='Both', command=self.both_clicked)
         self.close_btn = ttk.Button(self.frame, text='Close', command=self.close_clicked)
-        self.income_btn.grid(column=0,row=1,padx=5)
-        self.expenditure_btn.grid(column=1,row=1,padx=5)
-        self.close_btn.grid(column=2,row=1,padx=5)
+        self.income_btn.grid(column=0, row=1, padx=1, pady=7.5)
+        self.expenditure_btn.grid(column=1, row=1, padx=1, pady=7.5)
+        self.both_btn.grid(column=2, row=1, padx=1, pady=7.5)
+        self.close_btn.grid(column=3, row=1, padx=1, pady=5)
     
     # Button clicked
-    def ib_clicked(self):
+    def income_clicked(self):
         database_method('list', bMethod='Income')
-    def eb_clicked(self):
+    def expenditure_clicked(self):
         database_method('list', bMethod='Expenditure')
+    def both_clicked(self):
+        database_method('list', bMethod='Both')
     def close_clicked(self):
-        global POPUP_EXIST_WIN
+        global LIST_WINDOW
         if tkmsg.askyesno('Tip!','Do you want to close popup window?'):    
-            POPUP_EXIST_WIN = False
+            LIST_WINDOW = False
             self.master.destroy()
 
+# When Export button be clicked, then pop up a window
+# Extend  class: Popup_window __init__
+class Export_win(Popup_window):
+
+    def __init__(self, master):
+        super().__init__(master)
+    def create_widget(self):
+        # Label
+        self.top_text = ttk.Label(self.frame, text='Choose what you want to export')
+        self.top_text.grid(column=0, row=0, columnspan=3, sticky=tk.E+tk.W, padx=15)
+
+        # Radiobutton
+        self.var_radio = tk.IntVar()
+        self.income_rb = ttk.Radiobutton(self.frame, text='Income', variable=self.var_radio, value=1)
+        self.expenditure_rb = ttk.Radiobutton(self.frame, text='expenditure', variable=self.var_radio, value=2)
+        self.both_rb = ttk.Radiobutton(self.frame, text='Both', variable=self.var_radio, value=3)
+        self.income_rb.grid(column=0, row=1, padx=1, pady=5)
+        self.expenditure_rb.grid(column=1, row=1, padx=1, pady=5)
+        self.both_rb.grid(column=2, row=1, padx=1, pady=5)
+        self.income_rb.invoke()
+
+        # Button
+        self.confirm_btn = ttk.Button(self.frame, text='Confirm', command=self.confirm_clicked)
+        self.close_btn = ttk.Button(self.frame, text='Close', command=self.close_clicked)
+        self.confirm_btn.grid(column=0, row=2, padx=1, pady=5)
+        self.close_btn.grid(column=1, row=2, padx=1, pady=5, sticky=tk.W)
+
+    # Button clicked
+    def confirm_clicked(self):
+        if self.var_radio.get() == 1:
+            selected = 'Income'
+        elif self.var_radio.get() == 2:
+            selected = 'Expenditure'
+        elif self.var_radio.get() == 3:
+            selected = 'Both'
+        database_method('export', bMethod=selected)
+    def close_clicked(self):
+        global EXPORT_WINDOW
+        if tkmsg.askyesno('Tip!','Do you want to close popup window?'):    
+            EXPORT_WINDOW = False
+            self.master.destroy()
+
+# When you click the close icon in the upper right corner, it will pop up a tip window
 def disable_event():
     tkmsg.showinfo('Tip','Please click close button to close this application!')
 
+# Initialize application interface and method etc.
 def main():
     root = tk.Tk()
-    root.title('Bookkeeping')
-    root.geometry('400x240+250+250')
-    root.protocol("WM_DELETE_WINDOW", disable_event)
+    root.title('Book Keeping')
+    root.geometry('400x260+250+250')
+    # root.protocol("WM_DELETE_WINDOW", disable_event)
     root.config(bg='white')
     root.resizable(0, 0)
     app = application(root)
